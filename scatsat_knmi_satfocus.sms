@@ -1,0 +1,54 @@
+#! /bin/ksh
+
+# SCCS IDENTIFICATION:  @(#)rscat_knmi_satfocus.sms	1.0   09/05/2015 
+#   Modified by: Paul McCrone  x4403     04/20/2016
+
+####    For TEST environment:
+####    rscat_knmi_satfocus.sms -- SMS task for SATIPS/Rapid Scat data processing
+
+#@$-lt 20
+
+#
+# rscat_knmi_satfocus.sms
+#
+
+
+#   Set variables used by SMS
+export SMSBIN=                                       #! null for non-SMS test environment
+export SMSNAME=/satdat/bin/o_sat_rscat_knmi_satfocus #! a name to log
+export MON_NAME=rscat_knmi_satfocus.sms
+export SMSNODE=%SMSNODE%
+export SMSPASS=                     #! null for non-SMS test environment
+export SMS_PROG=%SMS_PROG%
+
+#   Set variables passed to the application task script
+export CRDATE=%CRDATE%
+export OPSPATH=/satdat
+export OPSBIN=$OPSPATH/bin
+export OPSFCN=$OPSPATH/job/bin
+export OUTPATH=/satdat/alpha/job/out/curr
+
+#   Path of in-basket directory:
+export XFER_BASEPATH=/satdat/alpha/rscat_knmi_satfocus
+#   Path of out-basket directory:
+export XFER_DATAPATH=$XFER_BASEPATH
+#   Path of static data:
+export HOST=abs
+export MAIL_TO=                         #! null for test
+export KEEP_RUNNING=                    #! needed for non-NQE test only
+#>export TMPDIR=                        #! needed for non-NQE test only
+
+
+#   Terminal setup
+unset TERMCAP
+
+#   Submit the job
+typeset JOBNAME=rscat_knmi_satfocus
+typeset -Z5 pid=$$      # Unique 5-digit number, increasing with time
+
+#export INIT_crash_files=$OUTPATH/${JOBNAME}.$pid
+#$OPSFCN/${JOBNAME}.job > $OUTPATH/${JOBNAME}.$pid 2>&1
+export INIT_crash_files=$LSB_OUTPUTFILE
+$OPSFCN/${JOBNAME}.job 2>&1
+#
+#

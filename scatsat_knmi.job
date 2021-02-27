@@ -1,0 +1,139 @@
+#! /bin/ksh
+#  FNMOC SCCS Identification:  $HeadURL$
+#  FNMOC SCCS Identification:  @(#)$Id$
+
+####  scatsat_knmi.job -- SATIPS job to convert ScatSat-1 raw NETCDF to ASCII  
+####                      (FNMOC FGGE ASCII format used previously by QuikScat).
+####                      (QuikSCAT, rec. 2).
+####                      (See: )
+####                      (http://a4au-a002/fgge_format/scatq_2.html)
+####
+
+
+####    This job runs under the SATIPS satmon monitor, which starts it
+####    when a new trmm hdf file appears in the job's in-basket directory.
+
+####    This job file specifies the environment variables that define the
+####    SPECIFIC job to the general-purpose scripts that contain most of
+####    the functionality:
+####        - jobutils.fcn   -- robust file-handling utilities and task setup
+####        - scatsat_knmi.fcn -- executes compiled programs to extract data
+
+##--------------------------------------------------------------------## 
+##                                                                    ##
+## NOTE: Adapted from Yiping Wang version of ascat processing script. ## 
+##                                                                    ##
+##--------------------------------------------------------------------## 
+#
+
+#### RECORD OF CHANGES:-----------------------------------------------##
+#
+#    Sept. 05, 2015  Paul McCrone, x1503 Release Version A.1.0
+#                    Make it run on Alpha
+#
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#
+#    Sept. 15, 2017  Paul McCrone, x1503 Release Version 3.0.0
+#                    Adjust Rapidscat script for ScatSat-1
+#
+##--------------------------------------------------------------------##
+
+####  Q S U B parameters:
+#QSUB -lt 30:00
+
+#################################################
+# Set up job-specific environment variables     #
+#################################################
+
+# Need:
+export TO_SOURCE="$OPSFCN/scatsat_knmi.fcn"  # File to include (source)
+##export TO_SOURCE="$OPSFCN/rscat_knmi.fcn"  # File to include (source)
+
+# Run:
+export MAIN=scatsat_knmi                # Define the main program
+export SYNC_DIR=$XFER_BASEPATH          # Directory for lock (sync) file
+export PROGBIN=${PROGBIN-$OPSBIN}       # Path to DMSP programs
+
+# Directory for input of RSCAT TDF DATA:
+##export RSCATTDF=${XFER_BASEPATH}/../tdfarc/rscat_knmi  
+export RSCATTDF=${XFER_BASEPATH}/../tdfarc/scatsat_knmi
+export RSCAT_LOG="${XFER_BASEPATH}/log"
+
+# Log:
+export LOGFILE=$XFER_BASEPATH/log.scatsat_knmi  # Log file
+export JOB=scatsat_knmi                     	# Unique job name, for log messages
+ 
+# Reporting:
+export MAIL_ON=ERR                      # Send error reports (only)
+export MAIL_TO=${MAIL_TO-satops}        # to satops list
+                                        # (unless already set, even to null)
+export OPERATOR=                        # Do call msg2opr when appropriate
+export CONSOLE_COLOR=yellow             # Do generate console log messages
+typeset console=${XFER_BASEPATH%/*}/console
+export RED_CONS_LOG=$console/red_msg.log
+export YELLOW_CONS_LOG=$console/yellow_msg.log
+export GREEN_CONS_LOG=$console/green_msg.log
+export OTHER_CONS_LOG=$console/unknown_msg.log
+export MASTER_CONS_LOG=$console/master.log
+
+#### ------------------------
+#### Rest of the file will serve without change for virtually ANY SMS job:
+#### ------------------------
+
+#################################################
+# Publish job version information in log        #
+#################################################
+
+#################################################
+# Source standard utilities, and start_job      #
+#################################################
+
+typeset script=$OPSFCN/jobutils.fcn
+
+if [[ -r $script ]]; then
+    . $script       # Source the utilities and start_job()
+
+#   (ksh aborts this script if '.' command fails, so need not test result!)
+
+    Start_job       # Start the setup and execution sequence,
+                    #   source'ing all needed scripts and executing $MAIN
+
+elif [[ -n $SMSPASS && $SMSPASS != "%SMSPASS%" ]]; then # running under SMS
+
+    msg2opr -i "Could not read $script, so could not start!"
+fi
+
+#### Some function must   exit   with appropriate exit code,
+####    so that execution never returns to this point!
+
+# Could not load standard error reporting/recovery utilities,
+#  so must diagnose/report the error ourselves:
+
+#################################################
+# Report failure in startup                     #
+#################################################
+
+set -x
+if [[ -z $OPSFCN ]]
+then
+    print "ERROR:  OPSFCN directory is not defined"    
+    exit $NO_ENV_VAR
+fi
+if [[ ! -d $OPSFCN || ! -x $OPSFCN ]]
+then
+    print "ERROR:  $OPSFCN directory is not accessible"
+    exit $NO_DIR
+fi
+if [[ ! -r $script ]]
+then
+    print "ERROR:  Utilities file is not readable:  $script"
+    exit $NO_SOURCE
+fi
+cp $script /dev/null
+if [[ $? != 0 ]]
+then
+    print "ERROR:  $script is corrupt:  bad disk?"
+    exit $CORRUPT
+fi
+
+

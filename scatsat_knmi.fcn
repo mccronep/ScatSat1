@@ -1,0 +1,243 @@
+#! /bin/ksh
+#  FNMOC SCCS Identification:  $HeadURL$
+#  FNMOC SCCS Identification:  @(#)$Id$
+
+####    scatsat_knmi.fcn
+#
+####    Functions for an SMS task that processes the ISRO SCATSAT-1 data for
+####    coverting the ISRO SCATSAT-1 NETCDF files (from KNMI) to ASCII [FGGE] data 
+####    
+#
+####    Executes:
+####        scatsat_knmi_process_ncdf.ksh
+####                   --------- which in turn executes:
+####        scatsat_knmi_convert_rscat_ncdf_2_qscat_ASCII.py 
+####                   --------- convert SCATSAT-1 NETCDF data to ASCII
+####        scatsat_knmi_satfocus_ncdf.ksh
+####                   --------- which in turn executes:
+####        scatsat_knmi_convert_rscat_ncdf_2_satfocus.py
+####                   --------- convert SCATSAT-1 NETCDF data to SATFOCUS ASCII files.
+####
+####    NOTE:  scatsat_knmi_convert_rscat_ncdf_2_qscat_ASCII.py is a python program.
+####           scatsat_knmi_convert_rscat_ncdf_2_satfocus.py    is a python program.
+####
+####
+####    NOTE:  Diagnose() reports to the monitor problems that must be
+####    fixed PRIOR TO the monitor's rerunning this task; this means that
+####    problems with OUTPUT files should NOT be Diagnose'd unless we are
+####    prepared to wait for the problem to be fixed and then rerun!
+#        
+#### Utility functions (from jobutils.fcn) called:
+# Log
+# Check_env
+# Report
+# Notify
+# Diagnose
+# MV
+# LN
+#
+#### Imported variables:
+
+# XFER_DATAPATH     Directory for processed files
+# INFORMATIVE       Exit code to put "INFORMATIVE" message in joblog file
+# OPSBIN            Path for OPS executable files
+# TCBIN             Path for holding TC executable files
+# TCPROCESS         Path for marking processed SSMI TDF files
+# TCLOG             Path for log of TC processing
+# TCETC             Path for configuration files
+# TSCANBIN          Path for Terascan executable files
+# TCBOGUS           Path for TC bogus/invest files of active storms
+# TCBOGUSSAVE       Path for TC bogus/invest files of non-active storms
+# SECTORS           Path for holding a list of bogus/invest files. This list 
+#                   will be used in TC image display
+
+#
+# NOTE: Adapted from Yiping Wang version of ascat processing script. 
+#
+
+#### RECORD OF CHANGES:
+#    Sept. 05, 2015  Paul McCrone, x4403 Release Version A.1.0
+#                    Make it run on Alpha
+#
+#    April 29, 2016  Paul McCrone, x4403 Release Version 2.4.9
+#                    Make it process netCDF to make SATFOCUS data. 
+#
+#    Sept. 15, 2017  Paul McCrone, x1503 Release Version 3.0.0
+#                    Repurpose RapidScat for Scatsat-1
+#
+#################################################
+# Publish function version information in log   #
+#################################################
+
+#### source the terascan startup calls
+###. ${TSCANPASS}/tscan.profile
+
+#####################################################
+# exit codes from rscat_knmi to tdf and TC processing    #
+#####################################################
+export Failed_txt=28
+export NO_ACTIVE_BOGUS=30
+export FAIL_OPEN_BOGUS=31
+
+#################################################
+#################################################
+
+#################################################
+# analyze_run_scatsat_knmi_exit_code()            #
+#################################################
+
+function analyze_run_scatsat_knmi_exit_code
+{
+integer code=$1         # exit code
+
+#  primary message to log are generic, can be reset in error handling below
+
+export pri_msg="ERROR $code:  Failed to processing $scatsat_knmi_file."
+export aux_msg=            # aux message to log are error specific
+
+set -x
+
+#turn_off_xvfb $DISPLAY
+
+case $code in
+#----------------
+# 1.  Following codes are probably due to a SYSTEM problem, resulting in NO
+#       data whatever being processed, so diagnose the problem and exit:
+#----------------
+
+    $UNIX_1)    # Could not execute the program at all (Unix error code 1)
+        Log $pri_msg
+        if [[ -f $scatsat_knmi_file ]]; then
+           mv $scatsat_knmi_file ${scatsat_knmi_path}/FAILED_$scatsat_knmi_name
+        fi
+        Diagnose rx $run            # will exit
+        ;;
+#----------------
+# 2.  Following code represents success, so report it, clean up, and exit:
+#----------------
+    0)  # Success!
+        msg="Processed $scatsat_knmi_name."
+        INIT_user_exit_params=$msg
+        #mv ${TCWEBWORK}/$rscat_knmi_name $XFER_DATAPATH
+        rm -f  $scatsat_knmi_file
+        Report 0 $scatsat_knmi_file  # Report success to the monitor process
+        exit 0
+        ;;
+#----------------
+# 3.  Following codes are error one, and need to notify operator.
+#----------------
+    $Failed_txt)
+        aux_msg="Failed to process $scatsat_knmi_name."
+    ;;
+#----------------
+# 4.  Following codes are for providing info., and don't notify operator.
+#----------------
+    $NO_ACTIVE_BOGUS)
+        Log "There is no any tc bogus for the active storms."
+        Report 0 $scatsat_knmi_file
+        mv $scatsat_knmi_file $XFER_DATAPATH
+        exit $INFORMATIVE
+    ;;
+    *)  # All other codes are unknown
+        aux_msg="FAILED(?):  Unknown error $code"
+        ;;
+esac
+
+# save input for examination
+if [[ -f $scatsat_knmi_file ]]; then
+    mv $scatsat_knmi_file ${scatsat_knmi_path}/FAILED_$scatsat_knmi_name
+fi
+
+Notify 0 $scatsat_knmi_file "$aux_msg"
+INIT_user_exit_params=$pri_msg  # original message goes to joblog
+exit $INFORMATIVE               # SMS gets "success" code since want no retry
+}
+
+#################################################
+# scatsat_knmi()                                #
+#################################################
+
+function scatsat_knmi
+{
+export scatsat_knmi_file=$1               # path of file to process
+Check_env scatsat_knmi_file               #  must be specified!
+Log "Processing $scatsat_knmi_file..."
+export scatsat_knmi_path=${scatsat_knmi_file%/*}
+Log "scatsat_knmi_path=$scatsat_knmi_path"
+export scatsat_knmi_name=${scatsat_knmi_file##*/} # file name w/o path, for shorter messages
+Log "scatsat_knmi_name=$scatsat_knmi_name"
+
+
+#### 1. Convert to text format:
+Log "PWD = $PWD"
+cd $scatsat_knmi_path
+
+############################################################################
+Log "-scatsat_knmi_direxist-_runs_to_verify_that_directories_EXIST."
+$OPSBIN/scatsat_knmi_direxist.ksh
+
+############################################################################
+
+###
+###############THIS IS THE PLACE WHERE THE PYTHON CODE SHOULD BE INVOKED.
+    export run=$OPSBIN/scatsat_knmi_process_ncdf.ksh
+    $OPSBIN/scatsat_knmi_process_ncdf.ksh
+############################################################################
+#
+#
+############################################################################
+Log "-scatsat_knmi_satfocus_direxist.ksh-_runs_to_verify_that_directories_EXIST."
+$OPSBIN/scatsat_knmi_satfocus_direxist.ksh
+#
+############################################################################
+#
+#
+############################################################################
+###############THIS IS THE PLACE WHERE THE PYTHON CODE SHOULD BE INVOKED.
+    export run=$OPSBIN/scatsat_knmi_satfocus_ncdf.ksh
+    $OPSBIN/scatsat_knmi_satfocus_ncdf.ksh
+############################################################################
+#
+###
+    typeset result=$?
+    if [[ $result != 0 ]] then
+       Log "Failed to process $scatsat_knmi_name"
+       mv $scatsat_knmi_file $scatsat_knmi_path/FAILED_$scatsat_knmi_name
+    fi
+    
+#       echo "sending data to Ruby via BOH"
+#       mv $isis_name $txt_isis_name2
+#       FNMOC_PROD="US058SCOM-IMGtwp"
+#
+#       $OPSBIN/bld_oasis_hdr -f $txt_isis_name2 -c U -d $boh_dest -n ${FNMOC_PROD}.$txt_isis_name2  -m ${FNMOC_PROD}.$txt_isis_name2 -t BINARY -p R -o $txt_isis_name2
+#
+#       #mv $txt_isis_name2 $XFER_BASEPATH/../data_in
+#
+#       mv $rscat_wind_file $XFER_DATAPATH 
+#       rm $etime_name
+#       #rm -f $rscat_wind_file
+#    else
+#       Log "Failed to generate $etime_name"
+#       mv $rscat_wind_file $rscat_wind_path/FAILED_$rscat_wind_name
+#       failed=1
+#    fi
+#done
+
+#### 5. Clean up
+
+Log "Clean up ..."
+#find ${XFER_BASEPATH}/txtTcweb -name "*"  -mtime +0  -exec rm {} \;
+#find ${XFER_BASEPATH}/txtModel -name "*"  -mtime +0  -exec rm {} \;
+#find ${XFER_BASEPATH}/TXT -name "*"  -mtime +0  -exec rm {} \;
+
+#${OPSBIN}/hour_find.pl 3 ${inpath}/txt$prod/ISIS |read saved_files
+
+analyze_run_scatsat_knmi_exit_code 0  # report success and exit
+
+}
+
+#
+################################################
+######   END
+################################################
+

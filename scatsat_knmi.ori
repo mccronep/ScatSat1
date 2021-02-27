@@ -1,0 +1,90 @@
+SCCS IDENTIFICATION: $HeadURL$
+SCCS IDENTIFICATION: @(#)$ID$ 
+
+DESCRIPTION: 
+
+            Name - scatsat_knmi.ori 
+
+            Unix User id -  opsu
+
+            Platform -  Emerald - A4
+
+Operational run instructions for the "o_sat_scatsat_knmi" processing 
+job. These jobs process ISRO ScatSat-1 scatterometer data for FNMOC 
+use. This job decodes ScatSat-1 scatterometry data received by KNMI
+(the Royal Netherlands Meteorological Institute) in NETCDF format 
+into an ASCII based FGGE format.  Input data is delivered to FNMOC 
+via ftp pushes from KNMI.  
+
+This job run under the SATIPS monitor, "sat_mon", which runs 
+CONTINUOUSLY, in the background, while Emerald PBS is active, 
+checking for incoming SATIPS files to be processed and signaling 
+PBS to start the corresponding processing suite. The "sat_mon" and 
+its associated processing tasks contain considerable error analysis 
+and error recovery logic.  The operator will normally receive very 
+explicit descriptions of processing, so that it will be clear just 
+what has failed and what needs to be done to fix the problem.  
+It will not normally be necessary for the operator to restart the 
+job after a problem is resolved; "sat_mon" will do that automatically 
+when it sees that the problem has disappeared.
+
+NOTE TO OPERATORS: 
+Re-run job manually only at the request of a SATIPS analyst.
+When the SATIPS analyst cannot be located, contact the programmer.
+
+NOTE TO SATIPS ANALYSTS:  
+Uses only CM software. Only the responsible programmer should
+modify job scripts, unless he can not be reached.  
+
+RESPONSIBILITY: A SATIPS N38DI division analyst is on call;
+
+Paul McCrone
+Yiping Wang
+Jeff Tesmer
+James A. Vermeulen
+
+PROGRAMMERS:
+          1) Paul McCrone          ext 1503 - home - 224-5483 or 
+					      Cell - 224-2701	
+          2) Yiping Wang           ext 1463 - home - 899-2379
+          3) Jeff Tesmer           ext 1461 - home - 375-2027
+     	  4) James A. Vermeulen    ext 1493 - home - 384-1993
+
+INPUT/DEPENDENCIES:  
+     - files at $XFER_BASEPATH with prefix "oscat_" 
+        
+OUTPUT:
+     - files with suffix "*.knmi.ascii.txt" are copied to $OUT_PATH.
+     - basic start/stop messages to system log, console logs and sat_mon log
+     - Detailed logs to $XFER_BASEPATH/log.rscat_knmi
+     - output to /satdat/ops/job/out/curr/o_sat_scatsat_knmi
+     
+SMS VARIABLES:  
+     $OPSBIN, $OPSFCN, $XFER_BASEPATH, $XFER_DATAPATH
+
+COMMON MSG2OPR MESSAGES:
+
+There are no 'common' msg2opr messages that have been known to occasionally occur.
+
+GENERAL ERROR MESSAGES:
+
+A variety msg2opr messages and/or joblog comments can be generated
+by this job or the sat_mon job which initiates the SMS task.
+They are infrequent and too numerous to list here. Follow these 
+procedures:
+
+     1) Check the system joblog for comments, e.g. "FAILED" or "INFORMATIVE"
+        with numeric code and/or message
+
+     2) Examine console logs for more detailed description of error.
+        Most descriptions begin with "ERROR".
+
+     3) Examine $XFER_BASEPATH/log.scatsat_knmi for other messages related
+        to the job failure.
+
+     4) If needed, examine /satdat/ops/job/out/curr/scatsat_knmi.sms.?????
+        for additional information.
+
+     5) Contact analyst with pertinent information.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
